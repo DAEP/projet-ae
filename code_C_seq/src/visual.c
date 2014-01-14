@@ -83,9 +83,9 @@ int visual_write_solution(problem_t *pb, int it)
     fprintf(fp, "part\n1\n");
     fprintf(fp, "block\n");
 
-    for(j = 1 ; j < pb->nb_y + 1 ; j++)
+    for(j = 0 ; j < pb->nb_y ; j++)
     {
-        for(i = 1 ; i < pb->nb_x + 1 ; i++)
+        for(i = 0 ; i < pb->nb_x ; i++)
         {
             fprintf(fp, "%10.5e\n", pb->temp[i][j]);
         }
