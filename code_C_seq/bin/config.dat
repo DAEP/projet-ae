@@ -1,0 +1,16 @@
+air diffusivity
+20.0e-6
+length_x / nb_cells_x / length_y / nb_cells_y
+0.1 100 0.1 100
+simulation_time / nb_timestep
+1. 100
+initial condition
+200.
+left_bc: bc_type / bc_value
+1 1000.
+right_bc: bc_type / bc_value
+1 1000.
+bottom_bc: bc_type / bc_value
+0 0.
+top_bc: bc_type / bc_value
+0 0.
