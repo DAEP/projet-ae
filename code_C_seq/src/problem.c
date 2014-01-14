@@ -82,7 +82,7 @@ int problem_set_mesh(problem_t *pb, double size_x, int nb_x, double size_y, int 
     pb->dy = size_y / (double) nb_y;
 
     // Create the array containing the solution
-    pb->temp = calloc(pb->nb_x + 2, sizeof(*(pb->temp)));
+    pb->temp = calloc(pb->nb_x, sizeof(*(pb->temp)));
     pb->temp_old = calloc(pb->nb_x + 2, sizeof(*(pb->temp_old)));
 
     if(pb->temp == NULL || pb->temp_old == NULL)
@@ -92,10 +92,16 @@ int problem_set_mesh(problem_t *pb, double size_x, int nb_x, double size_y, int 
 
     for(i = 0 ; i < pb->nb_x + 2; i++)
     {
-        pb->temp[i] = calloc(pb->nb_y + 2, sizeof(**(pb->temp)));
+        // pb->temp does not contain ghost cells
+        if(i < pb->nb_x)
+        {
+            pb->temp[i] = calloc(pb->nb_y, sizeof(**(pb->temp)));
+            assert(pb->temp[i] != NULL);
+        }
+
         pb->temp_old[i] = calloc(pb->nb_y + 2, sizeof(**(pb->temp_old)));
 
-        assert(pb->temp[i] != NULL && pb->temp_old[i] != NULL);
+        assert(pb->temp_old[i] != NULL);
     }
 
     return 0;
@@ -136,12 +142,10 @@ int problem_set_bnd(problem_t *pb, int bnd_id, int type, double value)
 
 int problem_check(problem_t *pb)
 {
-    // TODO: ecrire ca proprement
-    double cfl = pb->alpha * pb->dt / pow((pb->dx > pb->dy ? pb->dy : pb->dx), 2);
+    double delta_min = pb->dx < pb->dy ? pb->dx : pb->dy;
+    double cfl = pb->alpha * pb->dt / pow(delta_min, 2);
 
-    /*
-     * Stability check (CFL condition)
-     */
+    // Stability check (CFL condition)
     fprintf(stdout, "Stability check: CFL = %f\n", cfl);
 
     if(cfl >= 0.25)
@@ -158,8 +162,7 @@ int problem_solve(problem_t *pb)
     int i = 0;
     int j = 0;
     int k = 0;
-    double flux[4];
-    // TODO: pas besoin des ghost cells dans pb->temp
+    double flux;
 
     // Temporal loop
     for(k = 0 ; k < pb->nb_t ; k++)
@@ -181,22 +184,23 @@ int problem_solve(problem_t *pb)
         }
 
         // Compute fluxes and cell values
-        for(i = 1 ; i < pb->nb_x + 1 ; i++)
+        for(i = 0 ; i < pb->nb_x ; i++)
         {
-            for(j = 1 ; j < pb->nb_y + 1 ; j++)
+            for(j = 0 ; j < pb->nb_y ; j++)
             {
-                flux[0] = pb->dy / pb->dx * (pb->temp_old[i][j] - pb->temp_old[i - 1][j]);
-                flux[1] = pb->dy / pb->dx * (pb->temp_old[i + 1][j] - pb->temp_old[i][j]);
-                flux[2] = pb->dx / pb->dy * (pb->temp_old[i][j] - pb->temp_old[i][j - 1]);
-                flux[3] = pb->dx / pb->dy * (pb->temp_old[i][j + 1] - pb->temp_old[i][j]);
+                // flux = flux[1] + flux[3] - flux[0] - flux[2]
+                flux = pb->dy / pb->dx * (pb->temp_old[i + 2][j + 1] - pb->temp_old[i + 1][j + 1]);
+                flux += pb->dx / pb->dy * (pb->temp_old[i + 1][j + 2] - pb->temp_old[i + 1][j + 1]);
+                flux -= pb->dy / pb->dx * (pb->temp_old[i + 1][j + 1] - pb->temp_old[i][j + 1]);
+                flux -= pb->dx / pb->dy * (pb->temp_old[i + 1][j + 1] - pb->temp_old[i + 1][j]);
 
-                pb->temp[i][j] = pb->temp_old[i][j] + (pb->alpha * pb->dt) / (pb->dx * pb->dy) * (flux[1] + flux[3] - flux[0] - flux[2]);
+                pb->temp[i][j] = pb->temp_old[i + 1][j + 1] + (pb->alpha * pb->dt) / (pb->dx * pb->dy) * flux;
             }
         }
 
-        for(i = 0 ; i < pb->nb_x + 2 ; i++)
+        for(i = 0 ; i < pb->nb_x ; i++)
         {
-            memcpy(&(pb->temp_old[i][0]), &(pb->temp[i][0]), (pb->nb_y + 2) * sizeof(**(pb->temp)));
+            memcpy(&(pb->temp_old[i + 1][1]), &(pb->temp[i][0]), pb->nb_y * sizeof(**(pb->temp)));
         }
 
         visual_write_solution(pb, k);
@@ -213,7 +217,7 @@ int problem_destroy(problem_t *pb)
     {
         if(pb->temp != NULL)
         {
-            for(i = 0 ; i < pb->nb_x + 2; i++)
+            for(i = 0 ; i < pb->nb_x ; i++)
             {
                 if(pb->temp[i] != NULL)
                 {
@@ -226,7 +230,7 @@ int problem_destroy(problem_t *pb)
 
         if(pb->temp_old != NULL)
         {
-            for(i = 0 ; i < pb->nb_x + 2; i++)
+            for(i = 0 ; i < pb->nb_x + 2 ; i++)
             {
                 if(pb->temp_old[i] != NULL)
                 {
