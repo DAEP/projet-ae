@@ -23,6 +23,8 @@ typedef struct problem_t
 problem_t *problem_create(void);
 int problem_destroy(problem_t *pb);
 
+int problem_config(FILE *fp_config, problem_t *pb);
+
 int problem_set_consts(problem_t *pb, double alpha);
 int problem_set_mesh(problem_t *pb, double size_x, int nb_x, double size_y, int nb_y);
 int problem_set_tempo(problem_t *pb, double sim_time, int nb_t);
