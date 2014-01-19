@@ -17,51 +17,51 @@ problem_t *problem_create(void)
 
 int problem_config(FILE *fp_config, problem_t *pb)
 {
-	double diffusivity, length_x, length_y, solution_time, initial_cond, left_bc_value, right_bc_value, bottom_bc_value, top_bc_value;
-	int nb_cells_x, nb_cells_y, nb_timestep, left_bc_type, right_bc_type, bottom_bc_type, top_bc_type;
-	char line[FILE_LINE_LENGTH] = "";
+    double diffusivity, length_x, length_y, solution_time, initial_cond, left_bc_value, right_bc_value, bottom_bc_value, top_bc_value;
+    int nb_cells_x, nb_cells_y, nb_timestep, left_bc_type, right_bc_type, bottom_bc_type, top_bc_type;
+    char line[FILE_LINE_LENGTH] = "";
 
-	fgets(line, FILE_LINE_LENGTH, fp_config);
-	fgets(line, FILE_LINE_LENGTH, fp_config);
-	sscanf(line, "%lf", &diffusivity);
-	problem_set_consts(pb, diffusivity);
-	
-	fgets(line, FILE_LINE_LENGTH, fp_config);
- 	fgets(line, FILE_LINE_LENGTH, fp_config);
-	sscanf(line, "%lf %d %lf %d", &length_x, &nb_cells_x, &length_y, &nb_cells_y);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    sscanf(line, "%lf", &diffusivity);
+    problem_set_consts(pb, diffusivity);
+    
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    sscanf(line, "%lf %d %lf %d", &length_x, &nb_cells_x, &length_y, &nb_cells_y);
     problem_set_mesh(pb, length_x, nb_cells_x, length_y, nb_cells_y);
 
-	fgets(line, FILE_LINE_LENGTH, fp_config);
- 	fgets(line, FILE_LINE_LENGTH, fp_config);
-	sscanf(line, "%lf %d", &solution_time, &nb_timestep);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    sscanf(line, "%lf %d", &solution_time, &nb_timestep);
     problem_set_tempo(pb, solution_time, nb_timestep);
 
-	fgets(line, FILE_LINE_LENGTH, fp_config);
- 	fgets(line, FILE_LINE_LENGTH, fp_config);
-	sscanf(line, "%lf", &initial_cond);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    sscanf(line, "%lf", &initial_cond);
     problem_set_init_cond(pb, initial_cond);
 
-	fgets(line, FILE_LINE_LENGTH, fp_config);
- 	fgets(line, FILE_LINE_LENGTH, fp_config);
-	sscanf(line, "%d %lf", &left_bc_type, &left_bc_value);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    sscanf(line, "%d %lf", &left_bc_type, &left_bc_value);
     problem_set_bnd(pb, 0, left_bc_type, left_bc_value);
 
-	fgets(line, FILE_LINE_LENGTH, fp_config);
- 	fgets(line, FILE_LINE_LENGTH, fp_config);
-	sscanf(line, "%d %lf", &right_bc_type, &right_bc_value);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    sscanf(line, "%d %lf", &right_bc_type, &right_bc_value);
     problem_set_bnd(pb, 1, right_bc_type, right_bc_value);
 
-	fgets(line, FILE_LINE_LENGTH, fp_config);
- 	fgets(line, FILE_LINE_LENGTH, fp_config);
-	sscanf(line, "%d %lf", &bottom_bc_type, &bottom_bc_value);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    sscanf(line, "%d %lf", &bottom_bc_type, &bottom_bc_value);
     problem_set_bnd(pb, 2, bottom_bc_type, bottom_bc_value);
 
-	fgets(line, FILE_LINE_LENGTH, fp_config);
- 	fgets(line, FILE_LINE_LENGTH, fp_config);
-	sscanf(line, "%d %lf", &top_bc_type, &top_bc_value);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    sscanf(line, "%d %lf", &top_bc_type, &top_bc_value);
     problem_set_bnd(pb, 3, top_bc_type, top_bc_value);
 
-	return 0;
+    return 0;
 }
 
 int problem_set_consts(problem_t *pb, double alpha)
