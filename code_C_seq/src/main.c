@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-	problem_config(fp_config, pb);
+	problem_config(fp_config, pb, 1);
 
     problem_check(pb);
 
