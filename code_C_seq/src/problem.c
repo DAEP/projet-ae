@@ -12,56 +12,63 @@ problem_t *problem_create(void)
 {
     problem_t *pb = calloc(1, sizeof(problem_t));
 
+    pb->alloc = 0;
+
     return pb;
 }
 
-int problem_config(FILE *fp_config, problem_t *pb)
+int problem_config(FILE *fp_config, problem_t *pb, int alloc)
 {
-	double diffusivity, length_x, length_y, solution_time, initial_cond, left_bc_value, right_bc_value, bottom_bc_value, top_bc_value;
-	int nb_cells_x, nb_cells_y, nb_timestep, left_bc_type, right_bc_type, bottom_bc_type, top_bc_type;
-	char line[FILE_LINE_LENGTH] = "";
+    double diffusivity, length_x, length_y, solution_time, initial_cond, left_bc_value, right_bc_value, bottom_bc_value, top_bc_value;
+    int nb_cells_x, nb_cells_y, nb_timestep, left_bc_type, right_bc_type, bottom_bc_type, top_bc_type;
+    char line[FILE_LINE_LENGTH] = "";
 
-	fgets(line, FILE_LINE_LENGTH, fp_config);
-	fgets(line, FILE_LINE_LENGTH, fp_config);
-	sscanf(line, "%lf", &diffusivity);
-	problem_set_consts(pb, diffusivity);
-	
-	fgets(line, FILE_LINE_LENGTH, fp_config);
- 	fgets(line, FILE_LINE_LENGTH, fp_config);
-	sscanf(line, "%lf %d %lf %d", &length_x, &nb_cells_x, &length_y, &nb_cells_y);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    sscanf(line, "%lf", &diffusivity);
+    problem_set_consts(pb, diffusivity);
+    
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    sscanf(line, "%lf %d %lf %d", &length_x, &nb_cells_x, &length_y, &nb_cells_y);
     problem_set_mesh(pb, length_x, nb_cells_x, length_y, nb_cells_y);
 
-	fgets(line, FILE_LINE_LENGTH, fp_config);
- 	fgets(line, FILE_LINE_LENGTH, fp_config);
-	sscanf(line, "%lf %d", &solution_time, &nb_timestep);
+    if(alloc != 0)
+    {
+        problem_alloc_mesh(pb);
+    }
+
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    sscanf(line, "%lf %d", &solution_time, &nb_timestep);
     problem_set_tempo(pb, solution_time, nb_timestep);
 
-	fgets(line, FILE_LINE_LENGTH, fp_config);
- 	fgets(line, FILE_LINE_LENGTH, fp_config);
-	sscanf(line, "%lf", &initial_cond);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    sscanf(line, "%lf", &initial_cond);
     problem_set_init_cond(pb, initial_cond);
 
-	fgets(line, FILE_LINE_LENGTH, fp_config);
- 	fgets(line, FILE_LINE_LENGTH, fp_config);
-	sscanf(line, "%d %lf", &left_bc_type, &left_bc_value);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    sscanf(line, "%d %lf", &left_bc_type, &left_bc_value);
     problem_set_bnd(pb, 0, left_bc_type, left_bc_value);
 
-	fgets(line, FILE_LINE_LENGTH, fp_config);
- 	fgets(line, FILE_LINE_LENGTH, fp_config);
-	sscanf(line, "%d %lf", &right_bc_type, &right_bc_value);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    sscanf(line, "%d %lf", &right_bc_type, &right_bc_value);
     problem_set_bnd(pb, 1, right_bc_type, right_bc_value);
 
-	fgets(line, FILE_LINE_LENGTH, fp_config);
- 	fgets(line, FILE_LINE_LENGTH, fp_config);
-	sscanf(line, "%d %lf", &bottom_bc_type, &bottom_bc_value);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    sscanf(line, "%d %lf", &bottom_bc_type, &bottom_bc_value);
     problem_set_bnd(pb, 2, bottom_bc_type, bottom_bc_value);
 
-	fgets(line, FILE_LINE_LENGTH, fp_config);
- 	fgets(line, FILE_LINE_LENGTH, fp_config);
-	sscanf(line, "%d %lf", &top_bc_type, &top_bc_value);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    sscanf(line, "%d %lf", &top_bc_type, &top_bc_value);
     problem_set_bnd(pb, 3, top_bc_type, top_bc_value);
 
-	return 0;
+    return 0;
 }
 
 int problem_set_consts(problem_t *pb, double alpha)
@@ -73,13 +80,18 @@ int problem_set_consts(problem_t *pb, double alpha)
 
 int problem_set_mesh(problem_t *pb, double size_x, int nb_x, double size_y, int nb_y)
 {
-    int i = 0;
-
     pb->nb_x = nb_x;
     pb->nb_y = nb_y;
 
     pb->dx = size_x / (double) nb_x;
     pb->dy = size_y / (double) nb_y;
+
+    return 0;
+}
+
+int problem_alloc_mesh(problem_t *pb)
+{
+    int i = 0;
 
     // Create the array containing the solution
     pb->temp = calloc(pb->nb_x, sizeof(*(pb->temp)));
@@ -100,9 +112,10 @@ int problem_set_mesh(problem_t *pb, double size_x, int nb_x, double size_y, int 
         }
 
         pb->temp_old[i] = calloc(pb->nb_y + 2, sizeof(**(pb->temp_old)));
-
         assert(pb->temp_old[i] != NULL);
     }
+
+    pb->alloc = 1;
 
     return 0;
 }
@@ -119,12 +132,19 @@ int problem_set_init_cond(problem_t *pb, double t0)
 {
     int i = 0, j = 0;
 
-    for(i = 0 ; i < pb->nb_x + 2 ; i++)
+    if(pb->alloc == 1)
     {
-        for(j = 0 ; j < pb->nb_y + 2 ; j++)
+        for(i = 0 ; i < pb->nb_x + 2 ; i++)
         {
-            pb->temp_old[i][j] = t0;
+            for(j = 0 ; j < pb->nb_y + 2 ; j++)
+            {
+                pb->temp_old[i][j] = t0;
+            }
         }
+    }
+    else
+    {
+        pb->t0 = t0;
     }
 
     return 0;
