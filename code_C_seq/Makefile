@@ -70,7 +70,7 @@ clean:
 	@rm -rf $(OBJ)
 
 mrproper: clean
-	@rm -rf $(BIN)
+	@rm -rf $(PROGRAM)
 
 rebuild: mrproper all
 
