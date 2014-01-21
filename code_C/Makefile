@@ -30,7 +30,7 @@ BIN = bin
 C_SRC = main.c parallel.c problem.c visual.c
 C_OBJECTS = $(patsubst %.c,$(OBJ)/%.o,$(C_SRC))
 
-PROGRAM_NAME = code_C_seq
+PROGRAM_NAME = code_C
 PROGRAM = $(patsubst %,$(BIN)/%,$(PROGRAM_NAME))
 
 #-------------------------------------------------------------------------------
