@@ -1,17 +1,21 @@
 #include <stdlib.h>
 #include "visual.h"
+#include "parallel.h"
 #include "problem.h"
 
-int visual_write_case(problem_t *pb)
+int visual_write_case(problem_t *pb, parallel_t *par)
 {
     int i = 0;
+    char filename[80];
     FILE *fp = NULL;
 
-    fp = fopen("solut/ensight.case", "w");
+    sprintf(filename, "solut/ensight_%04d.case", par->rank);
+
+    fp = fopen(filename, "w");
 
     fprintf(fp, "FORMAT\ntype: ensight gold\n\n");
-    fprintf(fp, "GEOMETRY\nmodel: ensight.geo\n\n");
-    fprintf(fp, "VARIABLE\nscalar per element: Temperature temp_*******.ensight\n\n");
+    fprintf(fp, "GEOMETRY\nmodel: ensight_%04d.geo\n\n", par->rank);
+    fprintf(fp, "VARIABLE\nscalar per element: Temperature temp_*******_%04d.ensight\n\n", par->rank);
     fprintf(fp, "TIME\ntime set: 1\nnumber of steps: %d\nfilename start number: 0\nfilename increment: 1\ntime values:\n", pb->nb_t);
 
     for(i = 0 ; i < pb->nb_t ; i++)
@@ -24,13 +28,16 @@ int visual_write_case(problem_t *pb)
     return 0;
 }
 
-int visual_write_geo(problem_t *pb)
+int visual_write_geo(problem_t *pb, parallel_t *par)
 {
     int i = 0;
     int j = 0;
+    char filename[80];
     FILE *fp = NULL;
 
-    fp = fopen("solut/ensight.geo", "w");
+    sprintf(filename, "solut/ensight_%04d.geo", par->rank);
+
+    fp = fopen(filename, "w");
 
     fprintf(fp, "Ensight Gold Format file\n");
     fprintf(fp, "Heat equation example program\n");
@@ -69,14 +76,14 @@ int visual_write_geo(problem_t *pb)
     return 0;
 }
 
-int visual_write_solution(problem_t *pb, int it)
+int visual_write_solution(problem_t *pb, parallel_t *par, int it)
 {
     int i = 0;
     int j = 0;
     FILE *fp = NULL;
     char filename[80];
 
-    sprintf(filename, "solut/temp_%07d.ensight", it);
+    sprintf(filename, "solut/temp_%07d_%04d.ensight", it, par->rank);
     fp = fopen(filename, "w");
 
     fprintf(fp, "Temperature at cells\n");

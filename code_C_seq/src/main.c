@@ -1,41 +1,50 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <mpi/mpi.h>
+#include "parallel.h"
 #include "problem.h"
 #include "visual.h"
 
 int main(int argc, char *argv[])
 {
-    /*
-     * Constants, mesh definition and time discretization
-     */
-    problem_t *pb = problem_create();
-	FILE *fp_config = NULL;
+    problem_t *pb = NULL;
+    parallel_t *par = NULL;
 
-    if(pb == NULL)
+    MPI_Init(&argc, &argv);
+
+    par = parallel_create();
+    pb = problem_create();
+
+    if(pb == NULL || par == NULL)
     {
         fprintf(stderr, "Could not allocate memory!\n");
         return EXIT_FAILURE;
     }
 
-	fp_config = fopen(argv[1], "r");
-	if (fp_config == NULL)
+    MPI_Comm_size(MPI_COMM_WORLD, &par->np);
+    MPI_Comm_rank(MPI_COMM_WORLD, &par->rank);
+
+    if(par->rank == 0)
     {
-		fprintf(stderr, "Could not open the configuration file!\n");
-        return EXIT_FAILURE;
+        parallel_master(par);
+    }
+    
+    parallel_init(par, pb);
+
+    if(par->rank == 0)
+    {
+        problem_check(pb);
     }
 
-	problem_config(fp_config, pb, 1);
-
-    problem_check(pb);
-
-	fclose(fp_config);
-
-    visual_write_case(pb);
-    visual_write_geo(pb);
-
-    problem_solve(pb);
+    visual_write_case(pb, par);
+    visual_write_geo(pb, par);
+   
+    problem_solve(pb, par);
 
     problem_destroy(pb);
+    parallel_destroy(par);
 
+    MPI_Finalize();
+ 
     return EXIT_SUCCESS;
 }

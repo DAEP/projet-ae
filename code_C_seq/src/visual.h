@@ -3,10 +3,12 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include "problem.h"
 
-int visual_write_case(problem_t *pb);
-int visual_write_geo(problem_t *pb);
-int visual_write_solution(problem_t *pb, int it);
+struct problem_s;
+struct parallel_s;
+
+int visual_write_case(struct problem_s *pb, struct parallel_s *par);
+int visual_write_geo(struct problem_s *pb, struct parallel_s *par);
+int visual_write_solution(struct problem_s *pb, struct parallel_s *par, int it);
 
 #endif /* VISUAL_H_ */

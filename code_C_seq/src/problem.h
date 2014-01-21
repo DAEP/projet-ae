@@ -1,7 +1,9 @@
 #ifndef PROBLEM_H_
 #define PROBLEM_H_
 
-typedef struct problem_t
+struct parallel_s;
+
+typedef struct problem_s
 {
     double alpha;
 
@@ -35,6 +37,6 @@ int problem_set_tempo(problem_t *pb, double sim_time, int nb_t);
 int problem_set_init_cond(problem_t *pb, double t0);
 int problem_set_bnd(problem_t *pb, int bnd_id, int type, double value);
 int problem_check(problem_t *pb);
-int problem_solve(problem_t *pb);
+int problem_solve(problem_t *pb, struct parallel_s *par);
 
 #endif /* PROBLEM_H_ */

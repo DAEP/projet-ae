@@ -5,8 +5,8 @@
 #-------------------------------------------------------------------------------
 #		Programs
 #-------------------------------------------------------------------------------
-CC ?= gcc
-CXX ?= g++
+CC = mpicc
+CXX = mpic++
 
 #-------------------------------------------------------------------------------
 #		Flags
@@ -16,7 +16,7 @@ OPTIMIZATION += #-O3
 INCLUDES += 
 LIBS += -lm
 
-CFLAGS += -Wall -pedantic -std=c99
+CFLAGS += -Wall -Wextra -pedantic -std=c99
 CFLAGS += $(DEBUG) $(OPTIMIZATION) $(INCLUDES)
 LDFLAGS += $(DEBUG) $(OPTIMIZATION) $(LIBS)
 
@@ -27,7 +27,7 @@ VPATH = src
 OBJ = obj
 BIN = bin
 
-C_SRC = main.c problem.c visual.c
+C_SRC = main.c parallel.c problem.c visual.c
 C_OBJECTS = $(patsubst %.c,$(OBJ)/%.o,$(C_SRC))
 
 PROGRAM_NAME = code_C_seq

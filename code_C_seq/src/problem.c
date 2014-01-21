@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <mpi/mpi.h>
+#include "parallel.h"
 #include "problem.h"
 #include "visual.h"
 
@@ -13,6 +15,8 @@ problem_t *problem_create(void)
     problem_t *pb = calloc(1, sizeof(problem_t));
 
     pb->alloc = 0;
+    pb->temp = NULL;
+    pb->temp_old = NULL;
 
     return pb;
 }
@@ -177,30 +181,127 @@ int problem_check(problem_t *pb)
     return 0;
 }
 
-int problem_solve(problem_t *pb)
+int problem_solve(problem_t *pb, parallel_t *par)
 {
     int i = 0;
     int j = 0;
     int k = 0;
+    int p = 0;
+    int c = 0;
+    int count[4] = {pb->nb_y, pb->nb_y, pb->nb_x, pb->nb_x};
+    int pos[4] = {1, pb->nb_x, 1, pb->nb_y};
+    int pos_bc[4] = {0, pb->nb_x + 1, 0, pb->nb_y + 1};
+    int nrq = 0;
     double flux;
+    double *exch_in[4] = {NULL, NULL, NULL, NULL};
+    double *exch_out[4] = {NULL, NULL, NULL, NULL};
+    MPI_Request *rq = NULL;
+
+    // Alloc exchange arrays
+    for(p = 0 ; p < 4 ; p++)
+    {
+        if(par->neigh[p] >= 0)
+        {
+            exch_in[p] = calloc(count[p], sizeof(*exch_in[p]));
+            exch_out[p] = calloc(count[p], sizeof(*exch_out[p]));
+            nrq += 2;
+        }
+        
+    }
+
+    // Alloc MPI_Request handles
+    if(nrq != 0)
+    {
+        rq = calloc(nrq, sizeof(*rq));
+    }
 
     // Temporal loop
     for(k = 0 ; k < pb->nb_t ; k++)
     {
-        fprintf(stdout, "Iteration %d...\n", k);
-
-        // Update ghost cells on the left and on the right
-        for(j = 1 ; j < pb->nb_y + 1 ; j++)
+        if(par->rank == 0)
         {
-            pb->temp_old[0][j] = pb->bnd_type[0] * (2 * pb->bnd_value[0] - pb->temp_old[1][j]) + (1 - pb->bnd_type[0]) * (pb->temp_old[1][j] - pb->dy * pb->bnd_value[0]);
-            pb->temp_old[pb->nb_x + 1][j] = pb->bnd_type[1] * (2 * pb->bnd_value[1] - pb->temp_old[pb->nb_x][j]) + (1 - pb->bnd_type[1]) * (pb->temp_old[pb->nb_x][j] - pb->dy * pb->bnd_value[1]);
+            fprintf(stdout, "Iteration %d/%d (%4.2f %%)...\n", k, pb->nb_t, 100. * (double)k / (double)pb->nb_t);
         }
 
-        // Update ghost cells at the bottom and at the top
-        for(i = 1 ; i < pb->nb_x + 1 ; i++)
+        // Copy temperature data in the out buffer and update ghost cells
+        // containing boundary conditions values
+        for(p = 0 ; p < 4 ; p++)
         {
-            pb->temp_old[i][0] = pb->bnd_type[2] * (2 * pb->bnd_value[2] - pb->temp_old[i][1]) + (1 - pb->bnd_type[2]) * (pb->temp_old[i][1] - pb->dx * pb->bnd_value[2]);
-            pb->temp_old[i][pb->nb_y + 1] = pb->bnd_type[3] * (2 * pb->bnd_value[3] - pb->temp_old[i][pb->nb_y]) + (1 - pb->bnd_type[3]) * (pb->temp_old[i][pb->nb_y] - pb->dx * pb->bnd_value[3]);
+            if(par->neigh[p] >=0)
+            {
+                if(p < 2)
+                {
+                    for(c = 0 ; c < count[p] ; c++)
+                    {
+                        exch_out[p][c] = pb->temp_old[pos[p]][c + 1];
+                    }
+                }
+                else
+                {
+                    for(c = 0 ; c < count[p] ; c++)
+                    {
+                        exch_out[p][c] = pb->temp_old[c + 1][pos[p]];
+                    }
+                }
+            }
+        }
+        
+        // Exchange temperature field between partitions
+        nrq = 0;
+
+        for(p = 0 ; p < 4 ; p++)
+        {
+            if(par->neigh[p] >= 0)
+            {
+                MPI_Irecv(exch_in[p], count[p], MPI_DOUBLE, par->neigh[p], 3000, MPI_COMM_WORLD, &rq[nrq]);
+                MPI_Isend(exch_out[p], count[p], MPI_DOUBLE, par->neigh[p], 3000, MPI_COMM_WORLD, &rq[nrq + 1]);
+                nrq += 2;
+
+            }
+        }
+
+        MPI_Waitall(nrq, rq, MPI_STATUSES_IGNORE);
+
+        // Update ghost cells with data obtained from other partitions
+        // and values given by the boundary conditions
+        for(p = 0 ; p < 4 ; p++)
+        {
+            if(par->neigh[p] >= 0)
+            {
+                if(p < 2)
+                {
+                    for(c = 0 ; c < count[p] ; c++)
+                    {
+                        pb->temp_old[pos_bc[p]][c + 1] = exch_in[p][c];
+                    }
+                }
+                else
+                {
+                    for(c = 0 ; c < count[p] ; c++)
+                    {
+                        pb->temp_old[c + 1][pos_bc[p]] = exch_in[p][c];
+                    }
+                }
+            }
+            else
+            {
+                if(p < 2)
+                {
+                    for(c = 0 ; c < count[p] ; c++)
+                    {
+                        pb->temp_old[pos_bc[p]][c + 1] = pb->bnd_type[p] * (2 * pb->bnd_value[p] - pb->temp_old[pos[p]][c + 1])
+                            + (1 - pb->bnd_type[p]) * (pb->temp_old[pos[p]][c + 1] - pb->dy * pb->bnd_value[p]);
+                    }
+                }
+                else
+                {
+                    for(c = 0 ; c < count[p] ; c++)
+                    {
+                        pb->temp_old[c + 1][pos_bc[p]] = pb->bnd_type[p] * (2 * pb->bnd_value[p] - pb->temp_old[c + 1][pos[p]]) 
+                            + (1 - pb->bnd_type[p]) * (pb->temp_old[c + 1][pos[p]] - pb->dx * pb->bnd_value[p]);
+                    }
+                }
+            }
         }
 
         // Compute fluxes and cell values
@@ -223,7 +324,27 @@ int problem_solve(problem_t *pb)
             memcpy(&(pb->temp_old[i + 1][1]), &(pb->temp[i][0]), pb->nb_y * sizeof(**(pb->temp)));
         }
 
-        visual_write_solution(pb, k);
+        visual_write_solution(pb, par, k);
+    }
+
+    // Free MPI_Request handles
+    if(rq != NULL)
+    {
+        free(rq);
+    }
+
+    // Free exchange arrays
+    for(p = 0 ; p < 4 ; p++)
+    {
+        if(exch_in[p] != NULL)
+        {
+            free(exch_in[p]);
+        }
+
+        if(exch_out[p] != NULL)
+        {
+            free(exch_out[p]);
+        }
     }
 
     return 0;
