@@ -80,6 +80,7 @@ int parallel_master(parallel_t *par)
         MPI_Send(&pbt->dt, 1, MPI_DOUBLE, i, 2004, MPI_COMM_WORLD);
         MPI_Send(&pbt->nb_t, 1, MPI_INT, i, 2005, MPI_COMM_WORLD);
         MPI_Send(&pbt->t0, 1, MPI_DOUBLE, i, 2006, MPI_COMM_WORLD);
+        MPI_Send(&pbt->write, 1, MPI_INT, i, 2012, MPI_COMM_WORLD);
 
         col = i % par->np_x;
         row = (int)floor((double)i / (double)par->np_x);
@@ -149,6 +150,7 @@ int parallel_init(parallel_t *par, problem_t *pb)
     MPI_Recv(&pb->dt, 1, MPI_DOUBLE, 0, 2004, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     MPI_Recv(&pb->nb_t, 1, MPI_INT, 0, 2005, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     MPI_Recv(&pb->t0, 1, MPI_DOUBLE, 0, 2006, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Recv(&pb->write, 1, MPI_INT, 0, 2012, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
     MPI_Recv(&pb->nb_x, 1, MPI_INT, 0, 2007, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     MPI_Recv(&pb->nb_y, 1, MPI_INT, 0, 2008, MPI_COMM_WORLD, MPI_STATUS_IGNORE);

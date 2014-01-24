@@ -36,8 +36,11 @@ int main(int argc, char *argv[])
         problem_check(pb);
     }
 
-    visual_write_case(pb, par);
-    visual_write_geo(pb, par);
+    if(pb->write != 0)
+    {
+        visual_write_case(pb, par);
+        visual_write_geo(pb, par);
+    }
    
     problem_solve(pb, par);
 

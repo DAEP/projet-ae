@@ -24,7 +24,7 @@ problem_t *problem_create(void)
 int problem_config(FILE *fp_config, problem_t *pb, int alloc)
 {
     double diffusivity, length_x, length_y, solution_time, initial_cond, left_bc_value, right_bc_value, bottom_bc_value, top_bc_value;
-    int nb_cells_x, nb_cells_y, nb_timestep, left_bc_type, right_bc_type, bottom_bc_type, top_bc_type;
+    int nb_cells_x, nb_cells_y, nb_timestep, left_bc_type, right_bc_type, bottom_bc_type, top_bc_type, write_solut;
     char line[FILE_LINE_LENGTH] = "";
 
     fgets(line, FILE_LINE_LENGTH, fp_config);
@@ -72,12 +72,24 @@ int problem_config(FILE *fp_config, problem_t *pb, int alloc)
     sscanf(line, "%d %lf", &top_bc_type, &top_bc_value);
     problem_set_bnd(pb, 3, top_bc_type, top_bc_value);
 
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    fgets(line, FILE_LINE_LENGTH, fp_config);
+    sscanf(line, "%d", &write_solut);
+    problem_set_write(pb, write_solut);
+
     return 0;
 }
 
 int problem_set_consts(problem_t *pb, double alpha)
 {
     pb->alpha = alpha;
+
+    return 0;
+}
+
+int problem_set_write(problem_t *pb, int write)
+{
+    pb->write = write;
 
     return 0;
 }
@@ -324,7 +336,10 @@ int problem_solve(problem_t *pb, parallel_t *par)
             memcpy(&(pb->temp_old[i + 1][1]), &(pb->temp[i][0]), pb->nb_y * sizeof(**(pb->temp)));
         }
 
-        visual_write_solution(pb, par, k);
+        if(pb->write != 0)
+        {
+            visual_write_solution(pb, par, k);
+        }
     }
 
     // Free MPI_Request handles
