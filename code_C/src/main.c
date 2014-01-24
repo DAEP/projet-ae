@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <mpi/mpi.h>
+#include <mpi.h>
 #include "parallel.h"
 #include "problem.h"
 #include "visual.h"

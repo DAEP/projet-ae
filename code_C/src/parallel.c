@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <mpi/mpi.h>
+#include <mpi.h>
 #include "parallel.h"
 #include "problem.h"
 
