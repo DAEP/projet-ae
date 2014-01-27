@@ -23,8 +23,8 @@ typedef struct problem_s
 
     int write;
 
-    double **temp;
-    double **temp_old;
+    double **temp1;
+    double **temp2;
 } problem_t;
 
 problem_t *problem_create(void);

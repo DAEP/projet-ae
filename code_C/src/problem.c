@@ -15,8 +15,8 @@ problem_t *problem_create(void)
     problem_t *pb = calloc(1, sizeof(problem_t));
 
     pb->alloc = 0;
-    pb->temp = NULL;
-    pb->temp_old = NULL;
+    pb->temp1 = NULL;
+    pb->temp2 = NULL;
 
     return pb;
 }
@@ -108,27 +108,26 @@ int problem_set_mesh(problem_t *pb, double size_x, int nb_x, double size_y, int 
 int problem_alloc_mesh(problem_t *pb)
 {
     int i = 0;
+    double *t1, *t2;
 
     // Create the array containing the solution
-    pb->temp = calloc(pb->nb_x, sizeof(*(pb->temp)));
-    pb->temp_old = calloc(pb->nb_x + 2, sizeof(*(pb->temp_old)));
+    t1 = calloc((pb->nb_x + 2) * (pb->nb_y + 2), sizeof(*t1));
+    t2 = calloc((pb->nb_x + 2) * (pb->nb_y + 2), sizeof(*t2));
 
-    if(pb->temp == NULL || pb->temp_old == NULL)
+    if(t1 == NULL || t2 == NULL)
     {
         return -1;
     }
 
+    // Allocate and fill in the arrays that permit access to the data
+    // as if we had allocated a 2D array
+    pb->temp1 = calloc(pb->nb_x + 2, sizeof(*(pb->temp1)));
+    pb->temp2 = calloc(pb->nb_x + 2, sizeof(*(pb->temp2)));
+
     for(i = 0 ; i < pb->nb_x + 2; i++)
     {
-        // pb->temp does not contain ghost cells
-        if(i < pb->nb_x)
-        {
-            pb->temp[i] = calloc(pb->nb_y, sizeof(**(pb->temp)));
-            assert(pb->temp[i] != NULL);
-        }
-
-        pb->temp_old[i] = calloc(pb->nb_y + 2, sizeof(**(pb->temp_old)));
-        assert(pb->temp_old[i] != NULL);
+        pb->temp1[i] = &t1[i * (pb->nb_y + 2)];
+        pb->temp2[i] = &t2[i * (pb->nb_y + 2)];
     }
 
     pb->alloc = 1;
@@ -154,7 +153,7 @@ int problem_set_init_cond(problem_t *pb, double t0)
         {
             for(j = 0 ; j < pb->nb_y + 2 ; j++)
             {
-                pb->temp_old[i][j] = t0;
+                pb->temp1[i][j] = t0;
             }
         }
     }
@@ -205,9 +204,16 @@ int problem_solve(problem_t *pb, parallel_t *par)
     int pos_bc[4] = {0, pb->nb_x + 1, 0, pb->nb_y + 1};
     int nrq = 0;
     double flux;
+    double temp_ij = 0, c_flux = 0, dx_dy = 0, dy_dx = 0;
     double *exch_in[4] = {NULL, NULL, NULL, NULL};
     double *exch_out[4] = {NULL, NULL, NULL, NULL};
+    double **ttmp;
     MPI_Request *rq = NULL;
+
+    // Compute some values that will not change during the run
+    dx_dy = pb->dx / pb->dy;
+    dy_dx = pb->dy / pb->dx;
+    c_flux = (pb->alpha * pb->dt) / (pb->dx * pb->dy);
 
     // Alloc exchange arrays
     for(p = 0 ; p < 4 ; p++)
@@ -239,20 +245,20 @@ int problem_solve(problem_t *pb, parallel_t *par)
         // containing boundary conditions values
         for(p = 0 ; p < 4 ; p++)
         {
-            if(par->neigh[p] >=0)
+            if(par->neigh[p] >= 0)
             {
                 if(p < 2)
                 {
                     for(c = 0 ; c < count[p] ; c++)
                     {
-                        exch_out[p][c] = pb->temp_old[pos[p]][c + 1];
+                        exch_out[p][c] = pb->temp1[pos[p]][c + 1];
                     }
                 }
                 else
                 {
                     for(c = 0 ; c < count[p] ; c++)
                     {
-                        exch_out[p][c] = pb->temp_old[c + 1][pos[p]];
+                        exch_out[p][c] = pb->temp1[c + 1][pos[p]];
                     }
                 }
             }
@@ -284,14 +290,14 @@ int problem_solve(problem_t *pb, parallel_t *par)
                 {
                     for(c = 0 ; c < count[p] ; c++)
                     {
-                        pb->temp_old[pos_bc[p]][c + 1] = exch_in[p][c];
+                        pb->temp1[pos_bc[p]][c + 1] = exch_in[p][c];
                     }
                 }
                 else
                 {
                     for(c = 0 ; c < count[p] ; c++)
                     {
-                        pb->temp_old[c + 1][pos_bc[p]] = exch_in[p][c];
+                        pb->temp1[c + 1][pos_bc[p]] = exch_in[p][c];
                     }
                 }
             }
@@ -301,40 +307,43 @@ int problem_solve(problem_t *pb, parallel_t *par)
                 {
                     for(c = 0 ; c < count[p] ; c++)
                     {
-                        pb->temp_old[pos_bc[p]][c + 1] = pb->bnd_type[p] * (2 * pb->bnd_value[p] - pb->temp_old[pos[p]][c + 1])
-                            + (1 - pb->bnd_type[p]) * (pb->temp_old[pos[p]][c + 1] - pb->dy * pb->bnd_value[p]);
+                        pb->temp1[pos_bc[p]][c + 1] = pb->bnd_type[p] * (2 * pb->bnd_value[p] - pb->temp1[pos[p]][c + 1])
+                            + (1 - pb->bnd_type[p]) * (pb->temp1[pos[p]][c + 1] - pb->dy * pb->bnd_value[p]);
                     }
                 }
                 else
                 {
                     for(c = 0 ; c < count[p] ; c++)
                     {
-                        pb->temp_old[c + 1][pos_bc[p]] = pb->bnd_type[p] * (2 * pb->bnd_value[p] - pb->temp_old[c + 1][pos[p]]) 
-                            + (1 - pb->bnd_type[p]) * (pb->temp_old[c + 1][pos[p]] - pb->dx * pb->bnd_value[p]);
+                        pb->temp1[c + 1][pos_bc[p]] = pb->bnd_type[p] * (2 * pb->bnd_value[p] - pb->temp1[c + 1][pos[p]]) 
+                            + (1 - pb->bnd_type[p]) * (pb->temp1[c + 1][pos[p]] - pb->dx * pb->bnd_value[p]);
                     }
                 }
             }
         }
 
         // Compute fluxes and cell values
-        for(i = 0 ; i < pb->nb_x ; i++)
+        for(i = 1 ; i < pb->nb_x + 1 ; i++)
         {
-            for(j = 0 ; j < pb->nb_y ; j++)
+            for(j = 1 ; j < pb->nb_y + 1 ; j++)
             {
-                // flux = flux[1] + flux[3] - flux[0] - flux[2]
-                flux = pb->dy / pb->dx * (pb->temp_old[i + 2][j + 1] - pb->temp_old[i + 1][j + 1]);
-                flux += pb->dx / pb->dy * (pb->temp_old[i + 1][j + 2] - pb->temp_old[i + 1][j + 1]);
-                flux -= pb->dy / pb->dx * (pb->temp_old[i + 1][j + 1] - pb->temp_old[i][j + 1]);
-                flux -= pb->dx / pb->dy * (pb->temp_old[i + 1][j + 1] - pb->temp_old[i + 1][j]);
+                // Since temp1[i][j] is used 5 times, we copy it to optimize data access
+                temp_ij = pb->temp1[i][j];
 
-                pb->temp[i][j] = pb->temp_old[i + 1][j + 1] + (pb->alpha * pb->dt) / (pb->dx * pb->dy) * flux;
+                // flux = flux[1] + flux[3] - flux[0] - flux[2]
+                flux = dy_dx * (pb->temp1[i + 1][j] - temp_ij);
+                flux += dx_dy * (pb->temp1[i][j + 1] - temp_ij);
+                flux -= dy_dx * (temp_ij - pb->temp1[i - 1][j]);
+                flux -= dx_dy * (temp_ij - pb->temp1[i][j - 1]);
+
+                pb->temp2[i][j] = temp_ij + c_flux * flux;
             }
         }
 
-        for(i = 0 ; i < pb->nb_x ; i++)
-        {
-            memcpy(&(pb->temp_old[i + 1][1]), &(pb->temp[i][0]), pb->nb_y * sizeof(**(pb->temp)));
-        }
+        // Swaps pointers to the solution arrays
+        ttmp = pb->temp1;
+        pb->temp1 = pb->temp2; 
+        pb->temp2 = ttmp;
 
         if(pb->write != 0)
         {
@@ -367,34 +376,18 @@ int problem_solve(problem_t *pb, parallel_t *par)
 
 int problem_destroy(problem_t *pb)
 {
-    int i = 0;
-
     if(pb != NULL)
     {
-        if(pb->temp != NULL)
+        if(pb->temp1 != NULL)
         {
-            for(i = 0 ; i < pb->nb_x ; i++)
-            {
-                if(pb->temp[i] != NULL)
-                {
-                    free(pb->temp[i]);
-                }
-            }
-
-            free(pb->temp);
+            free(*pb->temp1);
+            free(pb->temp1);
         }
 
-        if(pb->temp_old != NULL)
+        if(pb->temp2 != NULL)
         {
-            for(i = 0 ; i < pb->nb_x + 2 ; i++)
-            {
-                if(pb->temp_old[i] != NULL)
-                {
-                    free(pb->temp_old[i]);
-                }
-            }
-
-            free(pb->temp_old);
+            free(*pb->temp2);
+            free(pb->temp2);
         }
 
         free(pb);

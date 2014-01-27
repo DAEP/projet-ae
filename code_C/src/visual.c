@@ -90,11 +90,11 @@ int visual_write_solution(problem_t *pb, parallel_t *par, int it)
     fprintf(fp, "part\n1\n");
     fprintf(fp, "block\n");
 
-    for(j = 0 ; j < pb->nb_y ; j++)
+    for(j = 1 ; j < pb->nb_y + 1 ; j++)
     {
-        for(i = 0 ; i < pb->nb_x ; i++)
+        for(i = 1 ; i < pb->nb_x + 1 ; i++)
         {
-            fprintf(fp, "%10.5e\n", pb->temp[i][j]);
+            fprintf(fp, "%10.5e\n", pb->temp1[i][j]);
         }
     }
 
