@@ -345,7 +345,7 @@ int problem_solve(problem_t *pb, parallel_t *par)
         pb->temp1 = pb->temp2; 
         pb->temp2 = ttmp;
 
-        if(pb->write != 0)
+        if(pb->write != 0 && (k % pb->write == 0))
         {
             visual_write_solution(pb, par, k);
         }

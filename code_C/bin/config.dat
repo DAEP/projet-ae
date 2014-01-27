@@ -15,4 +15,4 @@ bottom_bc: bc_type / bc_value
 top_bc: bc_type / bc_value
 0 0.
 write solution flag
-1
+10

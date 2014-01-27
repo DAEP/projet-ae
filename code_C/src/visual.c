@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdlib.h>
 #include "visual.h"
 #include "parallel.h"
@@ -16,9 +17,9 @@ int visual_write_case(problem_t *pb, parallel_t *par)
     fprintf(fp, "FORMAT\ntype: ensight gold\n\n");
     fprintf(fp, "GEOMETRY\nmodel: ensight_%04d.geo\n\n", par->rank);
     fprintf(fp, "VARIABLE\nscalar per element: Temperature temp_*******_%04d.ensight\n\n", par->rank);
-    fprintf(fp, "TIME\ntime set: 1\nnumber of steps: %d\nfilename start number: 0\nfilename increment: 1\ntime values:\n", pb->nb_t);
+    fprintf(fp, "TIME\ntime set: 1\nnumber of steps: %d\nfilename start number: 0\nfilename increment: %d\ntime values:\n", (int)ceil((double)pb->nb_t / (double)pb->write), pb->write);
 
-    for(i = 0 ; i < pb->nb_t ; i++)
+    for(i = 0 ; i < pb->nb_t ; i += pb->write)
     {
         fprintf(fp, "%12.5e\n", (i + 1) * pb->dt);
     }
