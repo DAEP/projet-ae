@@ -15,8 +15,6 @@ record problem {
     // Boundaries
     var bnd_type: [1..4] int;
     var bnd_value: [1..4] real;
-    // Domain
-    var physicalDomain, completeDomain: domain(2);
 
     /* Procedure: Reads problem configuration file
             f: file name
@@ -25,38 +23,30 @@ record problem {
         // file is opened in read mode
         var configFile = open(f, iomode.r);
         var reader = configFile.reader();
-        // TODO: modify the way the file is read using read() instead of readline or readln
         var line: string;
-        // lecture du fichier
-        reader.readline(line);
+        // file is read
+        reader.readln(line);
         alpha = reader.read(real);
-        reader.readline(line);
-        reader.readline(line);
+        reader.readln(line);
         length_x = reader.read(real);
         nb_cell_x = reader.read(int);
         length_y = reader.read(real);
         nb_cell_y = reader.read(int);
-        reader.readline(line);
-        reader.readline(line);
+        reader.readln(line);
         simulation_time = reader.read(real);
         nb_timestep = reader.read(int);
-        reader.readline(line);
-        reader.readline(line);
+        reader.readln(line);
         temp_initial = reader.read(real);
-        reader.readline(line);
-        reader.readline(line);
+        reader.readln(line);
         bnd_type(BND_LEFT) = reader.read(int);
         bnd_value(BND_LEFT) = reader.read(real);
-        reader.readline(line);
-        reader.readline(line);
+        reader.readln(line);
         bnd_type(BND_RIGHT) = reader.read(int); 
         bnd_value(BND_RIGHT) = reader.read(real);
-        reader.readline(line);
-        reader.readline(line);
+        reader.readln(line);
         bnd_type(BND_BOTTOM) = reader.read(int); 
         bnd_value(BND_BOTTOM) = reader.read(real);
-        reader.readline(line);
-        reader.readline(line);
+        reader.readln(line);
         bnd_type(BND_TOP) = reader.read(int);
         bnd_value(BND_TOP) = reader.read(real);
         
@@ -68,10 +58,6 @@ record problem {
         dx = length_x/nb_cell_x;
         dy = length_y/nb_cell_y;
         dt = simulation_time/nb_timestep;
-        // domain creation
-        var domainTemp: domain(2) dmapped Block({1..nb_cell_x, 1..nb_cell_y}) = {1..nb_cell_x, 1..nb_cell_y};
-        physicalDomain = domainTemp;
-        completeDomain = physicalDomain.expand(1);
     }
     
     
@@ -134,20 +120,9 @@ record problem {
             temp: reference to the domain
             it: iteration number
             */
-    proc write_data(ref temp: [completeDomain] real, it: int) {
+    proc write_data(ref temp: [?dim] real, it: int) {
         // data file name containing iteration number
-        var fileName: string;
-        fileName.write("solut/temp_");
-        // TODO: find a better way
-        fileName.write(it/1000000);
-        fileName.write(it/100000);
-        fileName.write(it/10000);
-        fileName.write(it/1000);
-        fileName.write(it/100);
-        fileName.write(it/10);
-        fileName.write(it%10);
-        fileName.write(".ensight");
-        
+        var fileName: string = "solut/temp_" + format("%07d",it) + ".ensight";
         var dataFile = open(fileName, iomode.cw);
         var w = dataFile.writer();
 
@@ -167,18 +142,21 @@ record problem {
 }
 
 /**************************************************/
-// config variable: configuration file name
+// configuration variables
 config var f: string = "config.dat";
 config var verbose: bool = true;
 config var write_data: bool = true;
 var pb: problem;
 
+// Problem configuration
 pb.read_config_file(f);
 if(write_data) then pb.write_case();
 if(write_data) then pb.write_geo();
 
-// Domain initialization
-var temp, temp_old: [pb.completeDomain] real = pb.temp_initial; 
+// Domain
+const physicalDomain: domain(2) dmapped Block({1..pb.nb_cell_x, 1..pb.nb_cell_y}) = {1..pb.nb_cell_x, 1..pb.nb_cell_y};
+const completeDomain = physicalDomain.expand(1);
+var temp, temp_old:  [completeDomain] real = pb.temp_initial; 
 
 /* CFL CONDITION */
 if(pb.alpha*pb.dt/min(pb.dx,pb.dy) >= 0.25){
@@ -189,11 +167,9 @@ if(pb.alpha*pb.dt/min(pb.dx,pb.dy) >= 0.25){
 
 /* Stencil definition */
 const stencil = ((0,0), (1,0), (0,1), (-1,0), (0,-1));
-
 const A = (1-2*pb.alpha*pb.dt*(pb.dy/pb.dx+pb.dx/pb.dy)/pb.dx/pb.dy, pb.alpha*pb.dt/pb.dx/pb.dx, pb.alpha*pb.dt/pb.dy/pb.dy, pb.alpha*pb.dt/pb.dx/pb.dx, pb.alpha*pb.dt/pb.dy/pb.dy);
 
 /* Iteration */
-/*   Cette boucle n'est pas parallèlisée car on ne veut pas créer des processus parallèls s'occupant chacun d'un timestep vu que l'on veut qu'ils se suivent les uns les autres */
 for k in 1..pb.nb_timestep {
     if(verbose) then writeln("Timestep#: ", k);
     
@@ -207,11 +183,9 @@ for k in 1..pb.nb_timestep {
         temp_old(i, pb.nb_cell_y+1) = pb.bnd_type(BND_TOP) * (2 * pb.bnd_value(BND_TOP) - temp_old(i, pb.nb_cell_y)) + (1 - pb.bnd_type(BND_TOP)) * (temp_old(i, pb.nb_cell_y) - pb.dx * pb.bnd_value(BND_TOP));
     }
 
-    // Parallel calculation of the temperature of the domain
-    forall cell in pb.physicalDomain {
+    // Parallel calculation of the temperature
+    forall cell in physicalDomain {
         temp(cell) = A(1)*temp_old(cell + stencil(1)) + A(2)*temp_old(cell + stencil(2)) + A(3)*temp_old(cell + stencil(3)) + A(4)*temp_old(cell + stencil(4)) + A(5)*temp_old(cell + stencil(5));
-        // la reduction semble TRES lente
-        //temp(cell) = (+ reduce [i in 1..5] A(i)*temp_old(cell + stencil(i)));
     }
     
     // Data storage for next iteration
