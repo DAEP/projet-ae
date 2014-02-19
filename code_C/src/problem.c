@@ -186,7 +186,7 @@ int problem_check(problem_t *pb)
     if(cfl >= 0.25)
     {
         fprintf(stderr, "Scheme won't be stable with the settings you chose. Ensure the CFL number is under 0.25.\n");
-        return -1;
+        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 
     return 0;
