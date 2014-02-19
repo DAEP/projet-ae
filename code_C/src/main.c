@@ -7,6 +7,7 @@
 
 int main(int argc, char *argv[])
 {
+    int nrq = 0;
     int nc, ntc;
     double t;
     double tmin, tmax, tmean;
@@ -14,6 +15,7 @@ int main(int argc, char *argv[])
     double tic_min, tic_max, tic_mean;
     problem_t *pb = NULL;
     parallel_t *par = NULL;
+    MPI_Request *rq = NULL;
 
     MPI_Init(&argc, &argv);
 
@@ -29,12 +31,18 @@ int main(int argc, char *argv[])
     MPI_Comm_size(MPI_COMM_WORLD, &par->np);
     MPI_Comm_rank(MPI_COMM_WORLD, &par->rank);
 
+    parallel_init(par, pb, &nrq, &rq);
+
     if(par->rank == 0)
     {
         parallel_master(par);
     }
-    
-    parallel_init(par, pb);
+
+    MPI_Waitall(nrq, rq, MPI_STATUSES_IGNORE);
+    free(rq);
+
+    problem_alloc_mesh(pb);
+    problem_set_init_cond(pb, pb->t0);
 
     if(par->rank == 0)
     {

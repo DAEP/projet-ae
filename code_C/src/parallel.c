@@ -15,6 +15,7 @@ parallel_t *parallel_create(void)
 
 int parallel_master(parallel_t *par)
 {
+    int nrq = 14;
     int np_yt = 0;
     int neigh[4], bnd_type[4];
     int i = 0;
@@ -24,6 +25,9 @@ int parallel_master(parallel_t *par)
     double bnd_value[4];
     problem_t *pbt = NULL;
     FILE *fp = NULL;
+    MPI_Request *rq = NULL;
+
+    rq = calloc(nrq, sizeof(*rq));
 
     // Read the configuration file and create a temporary
     // problem data holder
@@ -70,22 +74,22 @@ int parallel_master(parallel_t *par)
     for(i = 0 ; i < par->np ; i++)
     {
         // Number of partitions along x and y
-        MPI_Send(&par->np_x, 1, MPI_INT, i, 1001, MPI_COMM_WORLD);
-        MPI_Send(&par->np_y, 1, MPI_INT, i, 1002, MPI_COMM_WORLD);
+        MPI_Isend(&par->np_x, 1, MPI_INT, i, 1001, MPI_COMM_WORLD, &rq[0]);
+        MPI_Isend(&par->np_y, 1, MPI_INT, i, 1002, MPI_COMM_WORLD, &rq[1]);
 
         // Send problem definition
-        MPI_Send(&pbt->alpha, 1, MPI_DOUBLE, i, 2001, MPI_COMM_WORLD);
-        MPI_Send(&pbt->dx, 1, MPI_DOUBLE, i, 2002, MPI_COMM_WORLD);
-        MPI_Send(&pbt->dy, 1, MPI_DOUBLE, i, 2003, MPI_COMM_WORLD);
-        MPI_Send(&pbt->dt, 1, MPI_DOUBLE, i, 2004, MPI_COMM_WORLD);
-        MPI_Send(&pbt->nb_t, 1, MPI_INT, i, 2005, MPI_COMM_WORLD);
-        MPI_Send(&pbt->t0, 1, MPI_DOUBLE, i, 2006, MPI_COMM_WORLD);
-        MPI_Send(&pbt->write, 1, MPI_INT, i, 2012, MPI_COMM_WORLD);
+        MPI_Isend(&pbt->alpha, 1, MPI_DOUBLE, i, 2001, MPI_COMM_WORLD, &rq[2]);
+        MPI_Isend(&pbt->dx, 1, MPI_DOUBLE, i, 2002, MPI_COMM_WORLD, &rq[3]);
+        MPI_Isend(&pbt->dy, 1, MPI_DOUBLE, i, 2003, MPI_COMM_WORLD, &rq[4]);
+        MPI_Isend(&pbt->dt, 1, MPI_DOUBLE, i, 2004, MPI_COMM_WORLD, &rq[5]);
+        MPI_Isend(&pbt->nb_t, 1, MPI_INT, i, 2005, MPI_COMM_WORLD, &rq[6]);
+        MPI_Isend(&pbt->t0, 1, MPI_DOUBLE, i, 2006, MPI_COMM_WORLD, &rq[7]);
+        MPI_Isend(&pbt->write, 1, MPI_INT, i, 2012, MPI_COMM_WORLD, &rq[8]);
 
         col = i % par->np_x;
         row = (int)floor((double)i / (double)par->np_x);
-        MPI_Send(&nc_x[col], 1, MPI_INT, i, 2007, MPI_COMM_WORLD);
-        MPI_Send(&nc_y[row], 1, MPI_INT, i, 2008, MPI_COMM_WORLD);
+        MPI_Isend(&nc_x[col], 1, MPI_INT, i, 2007, MPI_COMM_WORLD, &rq[9]);
+        MPI_Isend(&nc_y[row], 1, MPI_INT, i, 2008, MPI_COMM_WORLD, &rq[10]);
 
         memset(bnd_value, 0., sizeof(bnd_value));
         memset(bnd_type, -1, sizeof(bnd_type));
@@ -123,44 +127,52 @@ int parallel_master(parallel_t *par)
             bnd_value[3] = pbt->bnd_value[3];
         }
 
-        MPI_Send(&neigh, 4, MPI_INT, i, 2009, MPI_COMM_WORLD);
-        MPI_Send(&bnd_type, 4, MPI_INT, i, 2010, MPI_COMM_WORLD);
-        MPI_Send(&bnd_value, 4, MPI_DOUBLE, i, 2011, MPI_COMM_WORLD);
+        MPI_Isend(&neigh, 4, MPI_INT, i, 2009, MPI_COMM_WORLD, &rq[11]);
+        MPI_Isend(&bnd_type, 4, MPI_INT, i, 2010, MPI_COMM_WORLD, &rq[12]);
+        MPI_Isend(&bnd_value, 4, MPI_DOUBLE, i, 2011, MPI_COMM_WORLD, &rq[13]);
 
+        MPI_Waitall(nrq, rq, MPI_STATUSES_IGNORE);
     }
 
     free(nc_x);
     free(nc_y);
+
+    free(rq);
 
     problem_destroy(pbt);
 
     return 0;
 }
 
-int parallel_init(parallel_t *par, problem_t *pb)
+int parallel_init(parallel_t *par, problem_t *pb, int *nrq, MPI_Request **rq)
 {
+    int lnrq = 14;
+    MPI_Request *lrq = NULL;
+
+    lrq = calloc(lnrq, sizeof(*lrq));
+
     // Receive partitionning data from master
-    MPI_Recv(&par->np_x, 1, MPI_INT, 0, 1001, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    MPI_Recv(&par->np_y, 1, MPI_INT, 0, 1002, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Irecv(&par->np_x, 1, MPI_INT, 0, 1001, MPI_COMM_WORLD, &lrq[0]);
+    MPI_Irecv(&par->np_y, 1, MPI_INT, 0, 1002, MPI_COMM_WORLD, &lrq[1]);
     
     // Receive problem definition from master
-    MPI_Recv(&pb->alpha, 1, MPI_DOUBLE, 0, 2001, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    MPI_Recv(&pb->dx, 1, MPI_DOUBLE, 0, 2002, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    MPI_Recv(&pb->dy, 1, MPI_DOUBLE, 0, 2003, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    MPI_Recv(&pb->dt, 1, MPI_DOUBLE, 0, 2004, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    MPI_Recv(&pb->nb_t, 1, MPI_INT, 0, 2005, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    MPI_Recv(&pb->t0, 1, MPI_DOUBLE, 0, 2006, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    MPI_Recv(&pb->write, 1, MPI_INT, 0, 2012, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Irecv(&pb->alpha, 1, MPI_DOUBLE, 0, 2001, MPI_COMM_WORLD, &lrq[2]);
+    MPI_Irecv(&pb->dx, 1, MPI_DOUBLE, 0, 2002, MPI_COMM_WORLD, &lrq[3]);
+    MPI_Irecv(&pb->dy, 1, MPI_DOUBLE, 0, 2003, MPI_COMM_WORLD, &lrq[4]);
+    MPI_Irecv(&pb->dt, 1, MPI_DOUBLE, 0, 2004, MPI_COMM_WORLD, &lrq[5]);
+    MPI_Irecv(&pb->nb_t, 1, MPI_INT, 0, 2005, MPI_COMM_WORLD, &lrq[6]);
+    MPI_Irecv(&pb->t0, 1, MPI_DOUBLE, 0, 2006, MPI_COMM_WORLD, &lrq[7]);
+    MPI_Irecv(&pb->write, 1, MPI_INT, 0, 2012, MPI_COMM_WORLD, &lrq[8]);
 
-    MPI_Recv(&pb->nb_x, 1, MPI_INT, 0, 2007, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    MPI_Recv(&pb->nb_y, 1, MPI_INT, 0, 2008, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Irecv(&pb->nb_x, 1, MPI_INT, 0, 2007, MPI_COMM_WORLD, &lrq[9]);
+    MPI_Irecv(&pb->nb_y, 1, MPI_INT, 0, 2008, MPI_COMM_WORLD, &lrq[10]);
 
-    MPI_Recv(&par->neigh, 4, MPI_INT, 0, 2009, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    MPI_Recv(&pb->bnd_type, 4, MPI_INT, 0, 2010, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    MPI_Recv(&pb->bnd_value, 4, MPI_DOUBLE, 0, 2011, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Irecv(&par->neigh, 4, MPI_INT, 0, 2009, MPI_COMM_WORLD, &lrq[11]);
+    MPI_Irecv(&pb->bnd_type, 4, MPI_INT, 0, 2010, MPI_COMM_WORLD, &lrq[12]);
+    MPI_Irecv(&pb->bnd_value, 4, MPI_DOUBLE, 0, 2011, MPI_COMM_WORLD, &lrq[13]);
 
-    problem_alloc_mesh(pb);
-    problem_set_init_cond(pb, pb->t0);
+    *nrq = lnrq;
+    *rq = lrq;
 
     return 0;
 }
