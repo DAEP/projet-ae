@@ -15,12 +15,13 @@ parallel_t *parallel_create(void)
 
 int parallel_master(parallel_t *par)
 {
-    int nrq = 14;
+    int nrq = 16;
     int np_yt = 0;
     int neigh[4], bnd_type[4];
     int i = 0;
     int col, row;
     int *nc_x, *nc_y;
+    double *cc_x, *cc_y;
     double ar = 0;
     double bnd_value[4];
     problem_t *pbt = NULL;
@@ -57,17 +58,37 @@ int parallel_master(parallel_t *par)
 
     nc_x = calloc(par->np_x, sizeof(*nc_x));
     nc_y = calloc(par->np_y, sizeof(*nc_y));
+    cc_x = calloc(par->np_x, sizeof(*cc_y));
+    cc_y = calloc(par->np_y, sizeof(*cc_y));
 
     for(i = 0 ; i < par->np_x ; i++)
     {
         nc_x[i] = (int)floor((double)pbt->nb_x / (double)par->np_x);
         nc_x[i] += (pbt->nb_x % par->np_x > i) ? 1 : 0;
+
+        if(i == 0)
+        {
+            cc_x[0] = 0.0;
+        }
+        else
+        {
+            cc_x[i] = cc_x[i - 1] + nc_x[i] * pbt->dx;
+        }
     }
 
     for(i = 0 ; i < par->np_y ; i++)
     {
         nc_y[i] = (int)floor((double)pbt->nb_y / (double)par->np_y);
         nc_y[i] += (pbt->nb_y % par->np_y > i) ? 1 : 0;
+
+        if(i == 0)
+        {
+            cc_y[0] = 0.0;
+        }
+        else
+        {
+            cc_y[i] = cc_y[i - 1] + nc_y[i] * pbt->dy;
+        }
     }
 
     // Send data to the processes
@@ -90,6 +111,8 @@ int parallel_master(parallel_t *par)
         row = (int)floor((double)i / (double)par->np_x);
         MPI_Isend(&nc_x[col], 1, MPI_INT, i, 2007, MPI_COMM_WORLD, &rq[9]);
         MPI_Isend(&nc_y[row], 1, MPI_INT, i, 2008, MPI_COMM_WORLD, &rq[10]);
+        MPI_Isend(&cc_x[col], 1, MPI_DOUBLE, i, 2012, MPI_COMM_WORLD, &rq[14]);
+        MPI_Isend(&cc_y[row], 1, MPI_DOUBLE, i, 2013, MPI_COMM_WORLD, &rq[15]);
 
         memset(bnd_value, 0., sizeof(bnd_value));
         memset(bnd_type, -1, sizeof(bnd_type));
@@ -136,6 +159,8 @@ int parallel_master(parallel_t *par)
 
     free(nc_x);
     free(nc_y);
+    free(cc_x);
+    free(cc_y);
 
     free(rq);
 
@@ -146,7 +171,7 @@ int parallel_master(parallel_t *par)
 
 int parallel_init(parallel_t *par, problem_t *pb, int *nrq, MPI_Request **rq)
 {
-    int lnrq = 14;
+    int lnrq = 16;
     MPI_Request *lrq = NULL;
 
     lrq = calloc(lnrq, sizeof(*lrq));
@@ -166,6 +191,8 @@ int parallel_init(parallel_t *par, problem_t *pb, int *nrq, MPI_Request **rq)
 
     MPI_Irecv(&pb->nb_x, 1, MPI_INT, 0, 2007, MPI_COMM_WORLD, &lrq[9]);
     MPI_Irecv(&pb->nb_y, 1, MPI_INT, 0, 2008, MPI_COMM_WORLD, &lrq[10]);
+    MPI_Irecv(&pb->blhc_x, 1, MPI_DOUBLE, 0, 2012, MPI_COMM_WORLD, &lrq[14]);
+    MPI_Irecv(&pb->blhc_y, 1, MPI_DOUBLE, 0, 2013, MPI_COMM_WORLD, &lrq[15]);
 
     MPI_Irecv(&par->neigh, 4, MPI_INT, 0, 2009, MPI_COMM_WORLD, &lrq[11]);
     MPI_Irecv(&pb->bnd_type, 4, MPI_INT, 0, 2010, MPI_COMM_WORLD, &lrq[12]);

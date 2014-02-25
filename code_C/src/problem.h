@@ -15,6 +15,9 @@ typedef struct problem_s
     int nb_y;
     int nb_t;
 
+    double blhc_x;
+    double blhc_y;
+
     int bnd_type[4];
     double bnd_value[4];
 

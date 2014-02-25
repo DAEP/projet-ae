@@ -52,7 +52,7 @@ int visual_write_geo(problem_t *pb, parallel_t *par)
     {
         for(i = 0 ; i < pb->nb_x + 1 ; i++)
         {
-            fprintf(fp, "%10.5e\n", pb->dx * i);
+            fprintf(fp, "%10.5e\n", pb->dx * i + pb->blhc_x);
         }
     }
 
@@ -60,7 +60,7 @@ int visual_write_geo(problem_t *pb, parallel_t *par)
     {
         for(i = 0 ; i < pb->nb_x + 1 ; i++)
         {
-            fprintf(fp, "%10.5e\n", pb->dy * j);
+            fprintf(fp, "%10.5e\n", pb->dy * j + pb->blhc_y);
         }
     }
 
