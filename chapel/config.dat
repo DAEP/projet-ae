@@ -1,16 +1,16 @@
 air diffusivity
 20.0e-6
 length_x / nb_cells_x / length_y / nb_cells_y
-0.1 100 0.1 100
+0.1 320 0.02 2
 simulation_time / nb_timestep
-0.01 10
+0.5 640
 initial condition
 200.
 left_bc: bc_type / bc_value
-1 300.
+1 500.
 right_bc: bc_type / bc_value
-1 300.
+1 100.
 bottom_bc: bc_type / bc_value
-1 1000.
+0 0.
 top_bc: bc_type / bc_value
-1 1000.
+0 0.

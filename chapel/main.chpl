@@ -1,4 +1,4 @@
-use BlockDist;
+use BlockDist, Time;
 
 // Define
 const BND_LEFT: int = 1, BND_RIGHT: int = 2, BND_BOTTOM: int = 3, BND_TOP: int = 4;
@@ -148,6 +148,9 @@ config var verbose: bool = true;
 config var write_data: bool = true;
 var pb: problem;
 
+// Timer
+var t: Timer;
+
 // Problem configuration
 pb.read_config_file(f);
 if(write_data) then pb.write_case();
@@ -157,28 +160,36 @@ if(write_data) then pb.write_geo();
 const physicalDomain: domain(2) dmapped Block({1..pb.nb_cell_x, 1..pb.nb_cell_y}) = {1..pb.nb_cell_x, 1..pb.nb_cell_y};
 const completeDomain = physicalDomain.expand(1);
 var temp, temp_old:  [completeDomain] real = pb.temp_initial; 
+// 1D domain for ghost cell update
+const x_domain: domain(1) dmapped Block({1..pb.nb_cell_x}) = {1..pb.nb_cell_x};
+const y_domain: domain(1) dmapped Block({1..pb.nb_cell_y}) = {1..pb.nb_cell_y};
 
 /* CFL CONDITION */
-if(pb.alpha*pb.dt/min(pb.dx,pb.dy) >= 0.25){
-    if(verbose) then writeln("CFL is too high:");
+const CFL = pb.alpha*pb.dt/min(pb.dx*pb.dx,pb.dy*pb.dy);
+if(CFL >= 0.25){
+    if(verbose) then writeln("CFL=" + CFL + " : Too high!");
+    exit(0);
 } else{
-    if(verbose) then writeln("CFL is OK");
+    if(verbose) then writeln("CFL=" + CFL + " : OK");
 }
 
 /* Stencil definition */
 const stencil = ((0,0), (1,0), (0,1), (-1,0), (0,-1));
 const A = (1-2*pb.alpha*pb.dt*(pb.dy/pb.dx+pb.dx/pb.dy)/pb.dx/pb.dy, pb.alpha*pb.dt/pb.dx/pb.dx, pb.alpha*pb.dt/pb.dy/pb.dy, pb.alpha*pb.dt/pb.dx/pb.dx, pb.alpha*pb.dt/pb.dy/pb.dy);
 
+// Start timer
+t.start();
+
 /* Iteration */
 for k in 1..pb.nb_timestep {
     if(verbose) then writeln("Timestep#: ", k);
     
     // Ghost cell update
-    forall j in 1..pb.nb_cell_y {
+    for j in y_domain {
         temp_old(0, j) = pb.bnd_type(BND_LEFT) * (2 * pb.bnd_value(BND_LEFT) - temp_old(1, j)) + (1 - pb.bnd_type(BND_LEFT)) * (temp_old(1, j) - pb.dy * pb.bnd_value(BND_LEFT));
         temp_old(pb.nb_cell_x+1, j) = pb.bnd_type(BND_RIGHT) * (2 * pb.bnd_value(BND_RIGHT) - temp_old(pb.nb_cell_x, j)) + (1 - pb.bnd_type(BND_RIGHT)) * (temp_old(pb.nb_cell_x, j) - pb.dy * pb.bnd_value(BND_RIGHT));
     }
-    forall i in 1..pb.nb_cell_x {
+    for i in x_domain {
         temp_old(i, 0) = pb.bnd_type(BND_BOTTOM) * (2 * pb.bnd_value(BND_BOTTOM) - temp_old(i, 1)) + (1 - pb.bnd_type(BND_BOTTOM)) * (temp_old(i, 1) - pb.dx * pb.bnd_value(BND_BOTTOM));
         temp_old(i, pb.nb_cell_y+1) = pb.bnd_type(BND_TOP) * (2 * pb.bnd_value(BND_TOP) - temp_old(i, pb.nb_cell_y)) + (1 - pb.bnd_type(BND_TOP)) * (temp_old(i, pb.nb_cell_y) - pb.dx * pb.bnd_value(BND_TOP));
     }
@@ -195,3 +206,33 @@ for k in 1..pb.nb_timestep {
     if(write_data) then pb.write_data(temp, k-1);
 }
 
+// Stop timer
+t.stop();
+
+var tmean = t.elapsed();
+var ti_mean = tmean/pb.nb_timestep;
+var tic_mean = 1000*ti_mean/pb.nb_cell_x/pb.nb_cell_y;
+if(write_data){
+    // file creation
+    var perfFile = open("solut/performance.perf", iomode.cw);
+    var w = perfFile.writer();
+    w.writeln("***************************************************************");
+    w.writeln(" * Elapsed time                    mean");
+    w.writeln(" * - Total (s):                    " + format("%-12.4lf", tmean));
+    w.writeln(" * - Per iteration (s):            " + format("%-12.4lf", ti_mean));
+    w.writeln(" * - Per iteration and cell (ms):  " + format("%-12.4lf", tic_mean));
+    w.writeln("***************************************************************");
+    w.close();
+    perfFile.close();
+}
+
+if(verbose){
+    writeln();
+    writeln("***************************************************************");
+    writeln(" * Elapsed time                    mean");
+    writeln(" * - Total (s):                    " + format("%-12.4lf", tmean));
+    writeln(" * - Per iteration (s):            " + format("%-12.4lf", ti_mean));
+    writeln(" * - Per iteration and cell (ms):  " + format("%-12.4lf", tic_mean));
+    writeln("***************************************************************");
+    writeln();
+}
